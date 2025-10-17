@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "975105851965",
+    "project_id": "citytripapp-b8eea",
+    "storage_bucket": "citytripapp-b8eea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975105851965:android:1de64f9d20180283a4e054",
+        "android_client_info": {
+          "package_name": "edu.ap.citytripapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwAkTvPbXDT8d-XOWLJ_J3RQ63a9vRFaU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975105851965:android:79e7986f9aee1b17a4e054",
+        "android_client_info": {
+          "package_name": "edu.ap.citytripapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwAkTvPbXDT8d-XOWLJ_J3RQ63a9vRFaU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
