@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "edu.ap.citytripapplication"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -61,4 +61,13 @@ dependencies {
 
     // Import the Firebase BoM
     implementation(platform(libs.firebase.bom))
+
+    // OSM (OpenStreetMap)
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+
+    // Location Services
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    // Accompanist (voor permissions) - correcte versie
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 }
