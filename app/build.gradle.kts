@@ -62,6 +62,8 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx") // ✅ NIEUW - voor Firestore database
+    implementation("com.google.firebase:firebase-storage-ktx")   // ✅ NIEUW - voor foto upload
 
     // OSM (OpenStreetMap)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
@@ -85,5 +87,8 @@ dependencies {
 
     // Icons
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Coil - Image loading library voor Compose ✅ NIEUW
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
 }
