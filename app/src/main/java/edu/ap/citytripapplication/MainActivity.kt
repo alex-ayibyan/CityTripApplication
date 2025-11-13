@@ -2,6 +2,7 @@
 
 package edu.ap.citytripapplication
 
+import AppNavigation
 import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,21 +13,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import edu.ap.citytripapplication.navigation.AppNavigation
-import edu.ap.citytripapplication.navigation.Screen
 import edu.ap.citytripapplication.ui.theme.CityTripApplicationTheme
 import edu.ap.citytripapplication.viewmodel.AuthViewModel
 import com.google.android.gms.location.LocationServices
@@ -39,10 +42,11 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        LocationProvider.initialize(applicationContext)
 
         // OSM Configuration
         Configuration.getInstance().load(
@@ -53,7 +57,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             CityTripApplicationTheme {
-                // Use AppNavigation to handle login/logout flow
                 AppNavigation()
             }
         }
@@ -63,10 +66,12 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    navController: NavController? = null,
-    authViewModel: AuthViewModel? = null
+    navController: androidx.navigation.NavController? = null,
+    onNavigateBack: () -> Unit = {},
+    onLocationUpdate: (android.location.Location) -> Unit = { _ -> } // Change to accept Location object
 ) {
     val context = LocalContext.current
+    val authViewModel: AuthViewModel = viewModel()
     val fusedLocationClient = remember {
         LocationServices.getFusedLocationProviderClient(context)
     }
@@ -94,31 +99,27 @@ fun MapScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            // TopBar with logout button
-            if (authViewModel != null && navController != null) {
-                TopAppBar(
-                    title = { Text("City Trip") },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                authViewModel.signOut()
-                                navController.navigate(Screen.Login.route) {
-                                    popUpTo(0) { inclusive = true }
-                                }
-                            }
-                        ) {
+            TopAppBar(
+                title = { Text("City Trip - Kaart") },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.padding(4.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                imageVector = Icons.Default.Logout,
-                                contentDescription = "Uitloggen"
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Terug naar steden",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-            }
+            )
         },
         floatingActionButton = {
             Column(
@@ -132,7 +133,7 @@ fun MapScreen(
                             currentLocation?.let { location ->
                                 navController.navigate(
                                     Screen.AddLocation.createRoute(
-                                        cityId = "default_city",
+                                        cityId = "default_city", // You might want to get this from a selected city
                                         latitude = location.latitude,
                                         longitude = location.longitude
                                     )
@@ -152,18 +153,20 @@ fun MapScreen(
                 FloatingActionButton(
                     onClick = {
                         if (locationPermissions.allPermissionsGranted) {
-                            goToMyLocation(fusedLocationClient, mapView) { location ->
-                                currentLocation = location
-                            }
+                            goToMyLocation(
+                                fusedLocationClient = fusedLocationClient,
+                                mapView = mapView,
+                                onLocationReceived = { location ->
+                                    currentLocation = location
+                                    onLocationUpdate(location) // Pass the location object
+                                }
+                            )
                         } else {
                             locationPermissions.launchMultiplePermissionRequest()
                         }
                     }
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Mijn locatie"
-                    )
+                    Icon(Icons.Default.LocationOn, contentDescription = "Mijn locatie")
                 }
             }
         }
@@ -233,10 +236,10 @@ private fun goToMyLocation(
             cancellationTokenSource.token
         ).addOnSuccessListener { location ->
             location?.let {
-                onLocationReceived(it)
                 val geoPoint = GeoPoint(it.latitude, it.longitude)
                 mapView?.controller?.animateTo(geoPoint)
                 mapView?.controller?.setZoom(15.0)
+                onLocationReceived(it)
             }
         }
     } catch (e: SecurityException) {

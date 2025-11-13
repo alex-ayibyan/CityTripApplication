@@ -1,7 +1,13 @@
+// AddLocationScreen.kt
 package edu.ap.citytripapplication.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -10,7 +16,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import edu.ap.citytripapplication.model.LocationCategory
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
 
@@ -19,17 +29,25 @@ import edu.ap.citytripapplication.viewmodel.LocationViewModel
 fun AddLocationScreen(
     viewModel: LocationViewModel,
     cityId: String,
-    currentLatitude: Double,
-    currentLongitude: Double,
+    currentLatitude: Double = 51.2194,
+    currentLongitude: Double = 4.4025,
     onNavigateBack: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(LocationCategory.OTHER) }
     var showCategoryDropdown by remember { mutableStateOf(false) }
-    
+
     val locationState by viewModel.locationState.collectAsState()
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
+
+    // Image picker launcher
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.setImageUri(it) }
+    }
 
     // Navigate back on success
     LaunchedEffect(locationState.savedSuccessfully) {
@@ -66,6 +84,88 @@ fun AddLocationScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Image upload section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Locatie Foto",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (locationState.imageUri != null) {
+                        // Show selected image
+                        Box(
+                            modifier = Modifier
+                                .height(200.dp)
+                                .fillMaxWidth()
+                        ) {
+                            Image(
+                                painter = rememberAsyncImagePainter(model = locationState.imageUri),
+                                contentDescription = "Geselecteerde foto",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            // Remove image button
+                            IconButton(
+                                onClick = { viewModel.clearImage() },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Foto verwijderen",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    } else {
+                        // Show image picker button
+                        Button(
+                            onClick = { imagePicker.launch("image/*") },
+                            modifier = Modifier
+                                .height(56.dp)
+                                .fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Foto Toevoegen (optioneel)")
+                        }
+                    }
+
+                    if (locationState.imageUri == null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Voeg een foto toe om je locatie herkenbaarder te maken",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+
             // Name field
             OutlinedTextField(
                 value = name,
@@ -78,7 +178,7 @@ fun AddLocationScreen(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !locationState.isSaving,
+                enabled = !locationState.isSaving && !locationState.isUploadingImage,
                 singleLine = true
             )
 
@@ -96,7 +196,7 @@ fun AddLocationScreen(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 maxLines = 5,
-                enabled = !locationState.isSaving
+                enabled = !locationState.isSaving && !locationState.isUploadingImage
             )
 
             // Category selector
@@ -124,7 +224,7 @@ fun AddLocationScreen(
                         .fillMaxWidth()
                         .menuAnchor(),
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    enabled = !locationState.isSaving
+                    enabled = !locationState.isSaving && !locationState.isUploadingImage
                 )
 
                 ExposedDropdownMenu(
@@ -143,7 +243,7 @@ fun AddLocationScreen(
                 }
             }
 
-            // Current location info
+            // Location info
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -164,7 +264,7 @@ fun AddLocationScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Huidige Locatie",
+                            text = "Locatie Coördinaten",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -177,6 +277,11 @@ fun AddLocationScreen(
                     )
                     Text(
                         text = "Lon: ${"%.6f".format(currentLongitude)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "Stad ID: $cityId",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -211,26 +316,35 @@ fun AddLocationScreen(
                         longitude = currentLongitude,
                         category = selectedCategory,
                         cityId = cityId,
+                        imageUri = locationState.imageUri, // Pass the image URI
                         onSuccess = onNavigateBack
                     )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = !locationState.isSaving && name.isNotBlank()
+                enabled = !locationState.isSaving &&
+                        !locationState.isUploadingImage &&
+                        name.isNotBlank()
             ) {
-                if (locationState.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Save,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Locatie Opslaan")
+                when {
+                    locationState.isUploadingImage -> {
+                        Text("Foto uploaden...")
+                    }
+                    locationState.isSaving -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Locatie Opslaan")
+                    }
                 }
             }
         }

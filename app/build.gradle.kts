@@ -62,8 +62,8 @@ dependencies {
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx") // ✅ NIEUW - voor Firestore database
-    implementation("com.google.firebase:firebase-storage-ktx")   // ✅ NIEUW - voor foto upload
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-storage-ktx")
 
     // OSM (OpenStreetMap)
     implementation("org.osmdroid:osmdroid-android:6.1.18")

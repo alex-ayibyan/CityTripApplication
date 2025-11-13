@@ -13,7 +13,8 @@ data class Location(
     val userId: String = "",
     val createdAt: Timestamp = Timestamp.now(),
     val averageRating: Double = 0.0,
-    val totalRatings: Int = 0
+    val totalRatings: Int = 0,
+    val imageUrl: String = ""
 )
 
 enum class LocationCategory(val displayName: String) {
@@ -25,8 +26,10 @@ enum class LocationCategory(val displayName: String) {
     ENTERTAINMENT("Entertainment"),
     HOTEL("Hotel"),
     CAFE("Café"),
+    ATTRACTION("Attractie"),
+    NIGHTLIFE("Nachtleven"),
     OTHER("Overig");
-    
+
     companion object {
         fun fromString(value: String): LocationCategory {
             return values().find { it.name == value } ?: OTHER
