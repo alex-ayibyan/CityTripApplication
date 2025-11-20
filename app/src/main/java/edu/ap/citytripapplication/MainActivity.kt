@@ -2,7 +2,7 @@
 
 package edu.ap.citytripapplication
 
-import AppNavigation
+import edu.ap.citytripapplication.navigation.AppNavigation
 import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -16,15 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,6 +31,7 @@ import edu.ap.citytripapplication.viewmodel.AuthViewModel
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import edu.ap.citytripapplication.navigation.Screen
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -128,7 +125,7 @@ fun MapScreen(
             ) {
                 // Add location button - only show if we have navController and current location
                 if (navController != null && currentLocation != null) {
-                    SmallFloatingActionButton(
+                    FloatingActionButton(
                         onClick = {
                             currentLocation?.let { location ->
                                 navController.navigate(

@@ -1,9 +1,9 @@
+package edu.ap.citytripapplication.navigation
+
+import LocationProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,18 +21,18 @@ import edu.ap.citytripapplication.viewmodel.AuthViewModel
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
 
 sealed class Screen(val route: String) {
-    object Login : Screen("login")
-    object Register : Screen("register")
-    object CitiesList : Screen("cities")
-    object AddCity : Screen("addCity")
-    object CityDetails : Screen("city/{cityId}") {
+    data object Login : Screen("login")
+    data object Register : Screen("register")
+    data object CitiesList : Screen("cities")
+    data object AddCity : Screen("addCity")
+    data object CityDetails : Screen("city/{cityId}") {
         fun createRoute(cityId: String) = "city/$cityId"
     }
-    object AddLocation : Screen("addLocation/{cityId}/{latitude}/{longitude}") {
+    data object AddLocation : Screen("addLocation/{cityId}/{latitude}/{longitude}") {
         fun createRoute(cityId: String, latitude: Double, longitude: Double) =
             "addLocation/$cityId/$latitude/$longitude"
     }
-    object Map : Screen("map")
+    data object Map : Screen("map")
 }
 
 @Composable
@@ -116,11 +116,13 @@ fun AppNavigation() {
                     val locationService = LocationProvider.getService()
                     val currentLocation = locationService.getCurrentLocation()
 
-                    navController.navigate(Screen.AddLocation.createRoute(
-                        cityId = cityIdForLocation,
-                        latitude = currentLocation?.latitude ?: 51.2194,
-                        longitude = currentLocation?.longitude ?: 4.4025
-                    ))
+                    navController.navigate(
+                        Screen.AddLocation.createRoute(
+                            cityId = cityIdForLocation,
+                            latitude = currentLocation?.latitude ?: 51.2194,
+                            longitude = currentLocation?.longitude ?: 4.4025
+                        )
+                    )
                 }
             )
         }

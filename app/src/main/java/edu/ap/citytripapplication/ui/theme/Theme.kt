@@ -9,35 +9,58 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import edu.ap.citytripapplication.ui.theme.Orange100
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = Turquoise300,
+    onPrimary = Turquoise900,
+    primaryContainer = Turquoise700,
+    onPrimaryContainer = Turquoise100,
+    
+    secondary = Orange300,
+    onSecondary = Orange900,
+    secondaryContainer = Orange700,
+    onSecondaryContainer = Orange100,
+    
+    tertiary = Purple300,
+    onTertiary = Purple900,
+    tertiaryContainer = Purple700,
+    onTertiaryContainer = Purple100,
+    
+    error = DeepOrange,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = Turquoise600,
     onPrimary = Color.White,
+    primaryContainer = Turquoise100,
+    onPrimaryContainer = Turquoise900,
+    
+    secondary = Orange600,
     onSecondary = Color.White,
+    secondaryContainer = Orange100,
+    onSecondaryContainer = Orange900,
+    
+    tertiary = Purple600,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiaryContainer = Purple100,
+    onTertiaryContainer = Purple900,
+    
+    error = DeepOrange,
+    background = Color(0xFFFAFAFA),
+    surface = Color.White,
+    surfaceVariant = Turquoise50,
 )
 
 @Composable
 fun CityTripApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Disabled by default to use our vibrant colors
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
