@@ -67,7 +67,8 @@ class CityDetailsViewModel : ViewModel() {
                             userId = doc.getString("userId") ?: "",
                             createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now(),
                             averageRating = doc.getDouble("averageRating") ?: 0.0,
-                            totalRatings = (doc.getLong("totalRatings") ?: 0).toInt()
+                            totalRatings = (doc.getLong("totalRatings") ?: 0).toInt(),
+                            imageUrl = doc.getString("imageUrl") ?: ""
                         )
                     }
                 _locations.value = locationsList
@@ -112,6 +113,4 @@ class CityDetailsViewModel : ViewModel() {
     fun refreshData(cityId: String) {
         loadCityData(cityId)
     }
-
-
 }

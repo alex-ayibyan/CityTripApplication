@@ -31,19 +31,35 @@ class ReviewViewModel : ViewModel() {
 
     fun loadReviews(locationId: String) {
         viewModelScope.launch {
+            println("DEBUG: Loading reviews for locationId: $locationId")
             _reviewState.value = _reviewState.value.copy(
                 isLoading = true,
                 error = null
             )
 
             try {
-                val reviewsList = firestore.collection("reviews")
-                    .whereEqualTo("locationId", locationId)
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .get()
-                    .await()
-                    .documents
-                    .map { doc ->
+                // First try with orderBy
+                val querySnapshot = try {
+                    firestore.collection("reviews")
+                        .whereEqualTo("locationId", locationId)
+                        .orderBy("createdAt", Query.Direction.DESCENDING)
+                        .get()
+                        .await()
+                } catch (e: Exception) {
+                    // If orderBy fails (missing index), try without it
+                    println("DEBUG: OrderBy failed, trying without index: ${e.message}")
+                    firestore.collection("reviews")
+                        .whereEqualTo("locationId", locationId)
+                        .get()
+                        .await()
+                }
+                
+                println("DEBUG: Found ${querySnapshot.documents.size} reviews")
+                
+                val reviewsList = querySnapshot.documents.mapNotNull { doc ->
+                    try {
+                        println("DEBUG: Processing review doc: ${doc.id}")
+                        println("DEBUG: Review data: ${doc.data}")
                         Review(
                             id = doc.id,
                             locationId = doc.getString("locationId") ?: "",
@@ -54,13 +70,21 @@ class ReviewViewModel : ViewModel() {
                             comment = doc.getString("comment") ?: "",
                             createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now()
                         )
+                    } catch (e: Exception) {
+                        println("DEBUG: Error parsing review ${doc.id}: ${e.message}")
+                        null
                     }
+                }.sortedByDescending { it.createdAt.seconds } // Sort in memory if needed
 
+                println("DEBUG: Mapped ${reviewsList.size} reviews to objects")
                 _reviewState.value = _reviewState.value.copy(
                     reviews = reviewsList,
                     isLoading = false
                 )
+                println("DEBUG: ReviewState updated with ${reviewsList.size} reviews")
             } catch (e: Exception) {
+                println("DEBUG: Error loading reviews: ${e.message}")
+                e.printStackTrace()
                 _reviewState.value = _reviewState.value.copy(
                     isLoading = false,
                     error = "Kon reviews niet laden: ${e.message}"
@@ -126,16 +150,23 @@ class ReviewViewModel : ViewModel() {
                     createdAt = Timestamp.now()
                 )
 
+                println("DEBUG: Creating review with ID: $reviewId")
+                println("DEBUG: Review data: locationId=$locationId, rating=$rating, userId=${currentUser.uid}")
+
                 // Save review
                 firestore.collection("reviews")
                     .document(reviewId)
                     .set(review)
                     .await()
 
+                println("DEBUG: Review saved successfully")
+
                 // Update location's average rating
+                println("DEBUG: Updating location rating...")
                 updateLocationRating(locationId)
 
                 // Reload reviews
+                println("DEBUG: Reloading reviews...")
                 loadReviews(locationId)
 
                 _reviewState.value = _reviewState.value.copy(
