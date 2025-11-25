@@ -1,12 +1,8 @@
-// CityDetailsScreen.kt
 package edu.ap.citytripapplication.ui.screens
 
+import LocationProvider
 import LocationService
 import androidx.compose.foundation.Image
-import kotlin.math.*
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.LocationOff
-import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,10 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddLocation
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,8 +23,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import edu.ap.citytripapplication.model.Location
 import edu.ap.citytripapplication.model.LocationCategory
+import edu.ap.citytripapplication.ui.components.AddReviewDialog
+import edu.ap.citytripapplication.ui.components.RatingDisplay
+import edu.ap.citytripapplication.ui.components.ReviewsList
 import edu.ap.citytripapplication.viewmodel.CityDetailsViewModel
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
+import edu.ap.citytripapplication.viewmodel.ReviewViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,13 +40,20 @@ fun CityDetailsScreen(
 ) {
     val cityDetailsViewModel: CityDetailsViewModel = viewModel()
     val locationViewModel: LocationViewModel = viewModel()
+    val reviewViewModel: ReviewViewModel = viewModel()
+    
     val city by cityDetailsViewModel.city.collectAsState()
     val filteredLocations by cityDetailsViewModel.filteredLocations.collectAsState()
     val selectedCategories by cityDetailsViewModel.selectedCategories.collectAsState()
     val isLoading by cityDetailsViewModel.isLoading.collectAsState()
+    
+    val reviewState by reviewViewModel.reviewState.collectAsState()
 
     var showFilterDialog by remember { mutableStateOf(false) }
     var showLocationModeDialog by remember { mutableStateOf(false) }
+    var selectedLocationForReview by remember { mutableStateOf<Location?>(null) }
+    var showReviewDialog by remember { mutableStateOf(false) }
+    var showReviewsForLocation by remember { mutableStateOf<Location?>(null) }
 
     // Get current location from service
     val currentLocation by remember(locationService) {
@@ -70,6 +74,14 @@ fun CityDetailsScreen(
     LaunchedEffect(locationState.savedSuccessfully) {
         if (locationState.savedSuccessfully) {
             cityDetailsViewModel.refreshData(cityId)
+        }
+    }
+
+    // Refresh after review is added
+    LaunchedEffect(reviewState.savedSuccessfully) {
+        if (reviewState.savedSuccessfully) {
+            cityDetailsViewModel.refreshData(cityId)
+            reviewViewModel.resetSavedState()
         }
     }
 
@@ -162,7 +174,7 @@ fun CityDetailsScreen(
                         )
                     }
 
-                    // Rest of your existing code...
+                    // Active filters
                     if (selectedCategories.isNotEmpty()) {
                         item {
                             ActiveFiltersRow(
@@ -172,6 +184,7 @@ fun CityDetailsScreen(
                         }
                     }
 
+                    // Empty state
                     if (filteredLocations.isEmpty()) {
                         item {
                             Text(
@@ -188,10 +201,19 @@ fun CityDetailsScreen(
                             )
                         }
                     } else {
+                        // Location cards
                         items(filteredLocations) { location ->
                             LocationCard(
                                 location = location,
-                                currentLocation = currentLocation
+                                currentLocation = currentLocation,
+                                onAddReview = {
+                                    selectedLocationForReview = location
+                                    showReviewDialog = true
+                                },
+                                onShowReviews = {
+                                    showReviewsForLocation = location
+                                    reviewViewModel.loadReviews(location.id)
+                                }
                             )
                         }
                     }
@@ -224,6 +246,300 @@ fun CityDetailsScreen(
             },
             onDismiss = { showLocationModeDialog = false }
         )
+    }
+
+    // Add Review Dialog
+    if (showReviewDialog && selectedLocationForReview != null) {
+        AddReviewDialog(
+            locationName = selectedLocationForReview!!.name,
+            onDismiss = {
+                if (!reviewState.isSaving) {
+                    showReviewDialog = false
+                    selectedLocationForReview = null
+                }
+            },
+            onSubmit = { rating, comment ->
+                reviewViewModel.addReview(
+                    locationId = selectedLocationForReview!!.id,
+                    rating = rating,
+                    comment = comment,
+                    onSuccess = {
+                        showReviewDialog = false
+                        selectedLocationForReview = null
+                    }
+                )
+            },
+            isSaving = reviewState.isSaving
+        )
+    }
+
+    // Reviews List Bottom Sheet
+    if (showReviewsForLocation != null) {
+        ReviewsBottomSheet(
+            location = showReviewsForLocation!!,
+            reviews = reviewState.reviews,
+            isLoading = reviewState.isLoading,
+            onDismiss = { showReviewsForLocation = null },
+            onDeleteReview = { reviewId ->
+                reviewViewModel.deleteReview(reviewId, showReviewsForLocation!!.id)
+            }
+        )
+    }
+
+    // Show error if any
+    reviewState.error?.let { error ->
+        LaunchedEffect(error) {
+            // You could show a Snackbar here
+            println("Review error: $error")
+        }
+    }
+}
+
+@Composable
+fun LocationCard(
+    location: Location,
+    currentLocation: android.location.Location? = null,
+    onAddReview: () -> Unit,
+    onShowReviews: () -> Unit
+) {
+    // Calculate distance if we have current location
+    val distance = remember(location, currentLocation) {
+        calculateDistance(location, currentLocation)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Show image if available
+            if (location.imageUrl.isNotBlank()) {
+                Image(
+                    painter = rememberAsyncImagePainter(model = location.imageUrl),
+                    contentDescription = "Foto van ${location.name}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Placeholder when no image is available
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Geen foto beschikbaar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = location.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CategoryChip(category = location.category)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (location.description.isNotBlank()) {
+                    Text(
+                        text = location.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Rating display
+                if (location.totalRatings > 0) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RatingDisplay(
+                                rating = location.averageRating.toInt(),
+                                size = 20.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${"%.1f".format(location.averageRating)} (${location.totalRatings})",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        TextButton(onClick = onShowReviews) {
+                            Text("Bekijk reviews")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Distance row - show if we have current location
+                if (currentLocation != null && distance != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Navigation,
+                            contentDescription = "Afstand",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = formatDistance(distance),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Coordinates
+                    Text(
+                        text = "📍 ${"%.4f".format(location.latitude)}, ${"%.4f".format(location.longitude)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Add review button
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onAddReview,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Review toevoegen")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReviewsBottomSheet(
+    location: Location,
+    reviews: List<edu.ap.citytripapplication.model.Review>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onDeleteReview: (String) -> Unit
+) {
+    var showSheet by remember { mutableStateOf(true) }
+
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showSheet = false
+                onDismiss()
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .padding(bottom = 32.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = location.name,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (location.totalRatings > 0) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RatingDisplay(
+                                    rating = location.averageRating.toInt(),
+                                    size = 20.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${"%.1f".format(location.averageRating)}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Reviews list
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    ReviewsList(
+                        reviews = reviews,
+                        onDeleteReview = onDeleteReview
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -411,6 +727,7 @@ fun LocationModeDialog(
         }
     )
 }
+
 private fun calculateDistance(
     location: Location,
     currentLocation: android.location.Location?
@@ -461,153 +778,6 @@ fun ActiveFiltersRow(
             Text("Wis")
         }
     }
-}
-
-@Composable
-fun LocationCard(
-    location: Location,
-    currentLocation: android.location.Location? = null
-) {
-    // Calculate distance if we have current location
-    val distance = remember(location, currentLocation) {
-        calculateDistance(location, currentLocation)
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Show image if available
-            if (location.imageUrl.isNotBlank()) {
-                Image(
-                    painter = rememberAsyncImagePainter(model = location.imageUrl),
-                    contentDescription = "Foto van ${location.name}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                // Placeholder when no image is available
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Geen foto beschikbaar",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = location.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    CategoryChip(category = location.category)
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (location.description.isNotBlank()) {
-                    Text(
-                        text = location.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Distance row - show if we have current location
-                if (currentLocation != null && distance != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Navigation,
-                            contentDescription = "Afstand",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = formatDistance(distance),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Coordinates
-                    Text(
-                        text = "📍 ${"%.4f".format(location.latitude)}, ${"%.4f".format(location.longitude)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    // Rating if available
-                    if (location.totalRatings > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "★ ${"%.1f".format(location.averageRating)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "(${location.totalRatings})",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "Nog geen beoordelingen",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun java.util.Date.toLocaleString(): String {
-    return java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(this)
 }
 
 @Composable
@@ -679,3 +849,9 @@ fun FilterDialog(
         }
     )
 }
+
+
+
+
+
+
