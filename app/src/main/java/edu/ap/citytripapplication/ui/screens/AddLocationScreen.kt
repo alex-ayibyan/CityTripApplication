@@ -1,7 +1,10 @@
 // AddLocationScreen.kt
 package edu.ap.citytripapplication.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -20,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import coil.compose.rememberAsyncImagePainter
 import edu.ap.citytripapplication.model.LocationCategory
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
@@ -37,16 +41,48 @@ fun AddLocationScreen(
     var description by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(LocationCategory.OTHER) }
     var showCategoryDropdown by remember { mutableStateOf(false) }
+    var showPermissionDialog by remember { mutableStateOf(false) }
 
     val locationState by viewModel.locationState.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
+    // Bepaal welke permission we nodig hebben op basis van Android versie
+    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    // Check of we permission hebben
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        println("DEBUG: Permission result: $isGranted")
+        hasPermission = isGranted
+        if (!isGranted) {
+            showPermissionDialog = true
+        }
+    }
+
     // Image picker launcher
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { viewModel.setImageUri(it) }
+        uri?.let { 
+            println("DEBUG: Image selected: $it")
+            viewModel.setImageUri(it) 
+        }
     }
 
     // Navigate back on success
@@ -136,7 +172,18 @@ fun AddLocationScreen(
                     } else {
                         // Show image picker button
                         Button(
-                            onClick = { imagePicker.launch("image/*") },
+                            onClick = {
+                                println("DEBUG: Photo button clicked")
+                                println("DEBUG: Has permission: $hasPermission")
+                                
+                                if (hasPermission) {
+                                    println("DEBUG: Opening image picker")
+                                    imagePicker.launch("image/*")
+                                } else {
+                                    println("DEBUG: Requesting permission")
+                                    permissionLauncher.launch(permission)
+                                }
+                            },
                             modifier = Modifier
                                 .height(56.dp)
                                 .fillMaxWidth(),
@@ -280,11 +327,6 @@ fun AddLocationScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-                    Text(
-                        text = "Stad ID: $cityId",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
                 }
             }
 
@@ -316,7 +358,7 @@ fun AddLocationScreen(
                         longitude = currentLongitude,
                         category = selectedCategory,
                         cityId = cityId,
-                        imageUri = locationState.imageUri, // Pass the image URI
+                        imageUri = locationState.imageUri,
                         onSuccess = onNavigateBack
                     )
                 },
@@ -329,6 +371,11 @@ fun AddLocationScreen(
             ) {
                 when {
                     locationState.isUploadingImage -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text("Foto uploaden...")
                     }
                     locationState.isSaving -> {
@@ -348,5 +395,38 @@ fun AddLocationScreen(
                 }
             }
         }
+    }
+
+    // Permission Dialog
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.PhotoCamera,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Foto Toegang Nodig") },
+            text = { 
+                Text("Om foto's toe te voegen heeft deze app toegang nodig tot je afbeeldingen. Klik op 'Toestaan' om toegang te verlenen.") 
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPermissionDialog = false
+                        permissionLauncher.launch(permission)
+                    }
+                ) {
+                    Text("Probeer Opnieuw")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text("Annuleer")
+                }
+            }
+        )
     }
 }

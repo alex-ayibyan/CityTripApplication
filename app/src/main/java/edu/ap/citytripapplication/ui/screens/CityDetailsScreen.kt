@@ -29,6 +29,9 @@ import edu.ap.citytripapplication.ui.components.ReviewsList
 import edu.ap.citytripapplication.viewmodel.CityDetailsViewModel
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
 import edu.ap.citytripapplication.viewmodel.ReviewViewModel
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.ui.graphics.asImageBitmap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,15 +319,14 @@ fun LocationCard(
         ) {
             // Show image if available
             if (location.imageUrl.isNotBlank()) {
-                Image(
-                    painter = rememberAsyncImagePainter(model = location.imageUrl),
-                    contentDescription = "Foto van ${location.name}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
+            Base64Image(
+                base64String = location.imageUrl,
+                contentDescription = "Foto van ${location.name}",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            )
+            }  else {
                 // Placeholder when no image is available
                 Box(
                     modifier = Modifier
@@ -850,6 +852,61 @@ fun FilterDialog(
     )
 }
 
+@Composable
+fun Base64Image(
+    base64String: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    if (base64String.isBlank()) {
+        // Show placeholder if no image
+        Box(
+            modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = "Geen foto",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        return
+    }
+
+    val bitmap = remember(base64String) {
+        try {
+            val imageBytes = android.util.Base64.decode(base64String, android.util.Base64.DEFAULT)
+            android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        } catch (e: Exception) {
+            println("ERROR: Failed to decode base64 image: ${e.message}")
+            null
+        }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    } else {
+        // Show error placeholder
+        Box(
+            modifier = modifier.background(MaterialTheme.colorScheme.errorContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = "Afbeelding laden mislukt",
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(40.dp)
+            )
+        }
+    }
+}
 
 
 

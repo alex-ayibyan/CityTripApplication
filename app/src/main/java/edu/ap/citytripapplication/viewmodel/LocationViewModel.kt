@@ -1,11 +1,14 @@
 package edu.ap.citytripapplication.viewmodel
 
+import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.lifecycle.ViewModel
+import android.util.Base64
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import edu.ap.citytripapplication.model.Location
 import edu.ap.citytripapplication.model.LocationCategory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 data class LocationState(
@@ -25,11 +29,10 @@ data class LocationState(
     val imageUri: Uri? = null
 )
 
-class LocationViewModel : ViewModel() {
+class LocationViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
-    private val storage = FirebaseStorage.getInstance()
-
+    
     private val _locationState = MutableStateFlow(LocationState())
     val locationState: StateFlow<LocationState> = _locationState.asStateFlow()
 
@@ -76,15 +79,15 @@ class LocationViewModel : ViewModel() {
             )
 
             try {
-                var imageUrl = ""
+                var imageBase64 = ""
 
-                // Upload image if provided
+                // Convert image to base64 if provided
                 if (imageUri != null) {
-                    println("DEBUG: Uploading image...")
+                    println("DEBUG: Converting image to base64...")
                     _locationState.value = _locationState.value.copy(isUploadingImage = true)
-                    imageUrl = uploadImageToFirebase(imageUri)
+                    imageBase64 = convertImageToBase64(imageUri)
                     _locationState.value = _locationState.value.copy(isUploadingImage = false)
-                    println("DEBUG: Image uploaded: $imageUrl")
+                    println("DEBUG: Image converted successfully (${imageBase64.length} characters)")
                 }
 
                 // Create location document
@@ -100,7 +103,7 @@ class LocationViewModel : ViewModel() {
                     category = category,
                     cityId = cityId,
                     userId = currentUser.uid,
-                    imageUrl = imageUrl
+                    imageUrl = imageBase64 // Store base64 string instead of URL
                 )
 
                 println("DEBUG: Location object created:")
@@ -108,7 +111,7 @@ class LocationViewModel : ViewModel() {
                 println("DEBUG:   - name: ${location.name}")
                 println("DEBUG:   - cityId: ${location.cityId}")
                 println("DEBUG:   - category: ${location.category.name}")
-                println("DEBUG:   - imageUrl: ${location.imageUrl}")
+                println("DEBUG:   - imageUrl length: ${location.imageUrl.length}")
 
                 // Save to Firestore
                 println("DEBUG: Saving to Firestore collection 'locations'...")
@@ -129,7 +132,8 @@ class LocationViewModel : ViewModel() {
                     
                     if (savedDoc.exists()) {
                         println("DEBUG: ✅ Verification: Document exists in Firestore")
-                        println("DEBUG: Saved data: ${savedDoc.data}")
+                        val savedImageLength = savedDoc.getString("imageUrl")?.length ?: 0
+                        println("DEBUG: Saved imageUrl length: $savedImageLength")
                     } else {
                         println("DEBUG: ⚠️ Verification: Document NOT found!")
                     }
@@ -158,58 +162,73 @@ class LocationViewModel : ViewModel() {
         }
     }
 
-    private suspend fun uploadImageToFirebase(imageUri: Uri): String {
+    /**
+     * Convert image URI to base64 string with compression
+     */
+    private fun convertImageToBase64(imageUri: Uri): String {
         return try {
-            println("DEBUG: Starting image upload with URI: $imageUri")
+            println("DEBUG: Opening image from URI: $imageUri")
+            val context = getApplication<Application>()
+            val inputStream = context.contentResolver.openInputStream(imageUri)
+            
+            if (inputStream == null) {
+                throw Exception("Kon afbeelding niet openen")
+            }
 
-            // Create a unique filename
-            val fileName = "location_images/${UUID.randomUUID()}.jpg"
-            val storageRef = storage.reference.child(fileName)
+            // Decode the image
+            println("DEBUG: Decoding bitmap...")
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
 
-            println("DEBUG: Storage reference: $storageRef")
-            println("DEBUG: Current user: ${auth.currentUser?.uid}")
+            if (bitmap == null) {
+                throw Exception("Kon bitmap niet decoderen")
+            }
 
-            // Upload the file with metadata
-            val metadata = com.google.firebase.storage.StorageMetadata.Builder()
-                .setContentType("image/jpeg")
-                .build()
+            println("DEBUG: Original bitmap size: ${bitmap.width}x${bitmap.height}")
 
-            println("DEBUG: Starting upload...")
-            val uploadTask = storageRef.putFile(imageUri, metadata)
+            // Compress and resize the image to reduce size
+            val maxWidth = 1024
+            val maxHeight = 1024
+            
+            val scaledBitmap = if (bitmap.width > maxWidth || bitmap.height > maxHeight) {
+                val scale = Math.min(
+                    maxWidth.toFloat() / bitmap.width,
+                    maxHeight.toFloat() / bitmap.height
+                )
+                val newWidth = (bitmap.width * scale).toInt()
+                val newHeight = (bitmap.height * scale).toInt()
+                
+                println("DEBUG: Scaling bitmap to: ${newWidth}x${newHeight}")
+                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            } else {
+                bitmap
+            }
 
-            // Wait for upload to complete
-            val taskSnapshot = uploadTask.await()
-            println("DEBUG: Upload completed successfully")
-
-            // Get the download URL
-            println("DEBUG: Getting download URL...")
-            val downloadUrl = storageRef.downloadUrl.await().toString()
-            println("DEBUG: Download URL obtained: $downloadUrl")
-
-            downloadUrl
+            // Convert to JPEG and then to base64
+            println("DEBUG: Converting to JPEG and base64...")
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
+            
+            println("DEBUG: Compressed image size: ${byteArray.size} bytes")
+            
+            val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
+            
+            // Clean up
+            if (scaledBitmap != bitmap) {
+                scaledBitmap.recycle()
+            }
+            bitmap.recycle()
+            
+            println("DEBUG: Base64 conversion successful")
+            base64String
 
         } catch (e: Exception) {
-            println("DEBUG: Image upload failed: ${e.message}")
+            println("DEBUG: Image conversion failed: ${e.message}")
             e.printStackTrace()
-
-            // Check for specific Firebase Storage errors
-            when {
-                e.message?.contains("does not have permission") == true -> {
-                    throw Exception("Geen toestemming om afbeeldingen te uploaden. Controleer Firebase Storage regels.")
-                }
-                e.message?.contains("not authenticated") == true -> {
-                    throw Exception("Niet ingelogd. Log opnieuw in.")
-                }
-                e.message?.contains("404") == true -> {
-                    throw Exception("Firebase Storage niet gevonden. Controleer je Firebase configuratie.")
-                }
-                else -> {
-                    throw Exception("Kon afbeelding niet uploaden: ${e.message}")
-                }
-            }
+            throw Exception("Kon afbeelding niet converteren: ${e.message}")
         }
     }
-
 
     fun setImageUri(uri: Uri?) {
         _locationState.value = _locationState.value.copy(imageUri = uri)
@@ -238,9 +257,3 @@ class LocationViewModel : ViewModel() {
         )
     }
 }
-
-
-
-
-
-
