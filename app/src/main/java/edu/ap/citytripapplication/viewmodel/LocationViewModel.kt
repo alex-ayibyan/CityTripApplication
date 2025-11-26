@@ -1,4 +1,3 @@
-// LocationViewModel.kt
 package edu.ap.citytripapplication.viewmodel
 
 import android.net.Uri
@@ -44,6 +43,13 @@ class LocationViewModel : ViewModel() {
         imageUri: Uri? = null,
         onSuccess: () -> Unit
     ) {
+        println("DEBUG: ========== SAVING LOCATION ==========")
+        println("DEBUG: Name: $name")
+        println("DEBUG: CityId: $cityId")
+        println("DEBUG: Category: ${category.name}")
+        println("DEBUG: Latitude: $latitude, Longitude: $longitude")
+        println("DEBUG: Has Image: ${imageUri != null}")
+        
         if (name.isBlank()) {
             _locationState.value = _locationState.value.copy(
                 error = "Naam mag niet leeg zijn"
@@ -53,11 +59,14 @@ class LocationViewModel : ViewModel() {
 
         val currentUser = auth.currentUser
         if (currentUser == null) {
+            println("DEBUG: ❌ No user logged in!")
             _locationState.value = _locationState.value.copy(
                 error = "Je moet ingelogd zijn om een locatie op te slaan"
             )
             return
         }
+        
+        println("DEBUG: User ID: ${currentUser.uid}")
 
         viewModelScope.launch {
             _locationState.value = _locationState.value.copy(
@@ -71,13 +80,17 @@ class LocationViewModel : ViewModel() {
 
                 // Upload image if provided
                 if (imageUri != null) {
+                    println("DEBUG: Uploading image...")
                     _locationState.value = _locationState.value.copy(isUploadingImage = true)
                     imageUrl = uploadImageToFirebase(imageUri)
                     _locationState.value = _locationState.value.copy(isUploadingImage = false)
+                    println("DEBUG: Image uploaded: $imageUrl")
                 }
 
                 // Create location document
                 val locationId = UUID.randomUUID().toString()
+                println("DEBUG: Generated location ID: $locationId")
+                
                 val location = Location(
                     id = locationId,
                     name = name,
@@ -90,19 +103,52 @@ class LocationViewModel : ViewModel() {
                     imageUrl = imageUrl
                 )
 
+                println("DEBUG: Location object created:")
+                println("DEBUG:   - id: ${location.id}")
+                println("DEBUG:   - name: ${location.name}")
+                println("DEBUG:   - cityId: ${location.cityId}")
+                println("DEBUG:   - category: ${location.category.name}")
+                println("DEBUG:   - imageUrl: ${location.imageUrl}")
+
                 // Save to Firestore
+                println("DEBUG: Saving to Firestore collection 'locations'...")
                 firestore.collection("locations")
                     .document(locationId)
                     .set(location)
                     .await()
+
+                println("DEBUG: ✅ Location saved successfully to Firestore!")
+                println("DEBUG: Document path: locations/$locationId")
+
+                // Verify the save by reading it back
+                try {
+                    val savedDoc = firestore.collection("locations")
+                        .document(locationId)
+                        .get()
+                        .await()
+                    
+                    if (savedDoc.exists()) {
+                        println("DEBUG: ✅ Verification: Document exists in Firestore")
+                        println("DEBUG: Saved data: ${savedDoc.data}")
+                    } else {
+                        println("DEBUG: ⚠️ Verification: Document NOT found!")
+                    }
+                } catch (e: Exception) {
+                    println("DEBUG: ⚠️ Could not verify save: ${e.message}")
+                }
 
                 _locationState.value = _locationState.value.copy(
                     isSaving = false,
                     savedSuccessfully = true
                 )
 
+                println("DEBUG: Calling onSuccess callback...")
                 onSuccess()
+                println("DEBUG: ========== SAVE COMPLETE ==========")
+                
             } catch (e: Exception) {
+                println("DEBUG: ❌ Error saving location: ${e.message}")
+                e.printStackTrace()
                 _locationState.value = _locationState.value.copy(
                     isSaving = false,
                     isUploadingImage = false,
@@ -184,6 +230,7 @@ class LocationViewModel : ViewModel() {
     }
 
     fun resetSavedState() {
+        println("DEBUG: Resetting saved state")
         _locationState.value = _locationState.value.copy(
             savedSuccessfully = false,
             isSaving = false,
@@ -191,3 +238,9 @@ class LocationViewModel : ViewModel() {
         )
     }
 }
+
+
+
+
+
+

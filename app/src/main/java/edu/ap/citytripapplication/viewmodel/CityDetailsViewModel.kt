@@ -33,6 +33,8 @@ class CityDetailsViewModel : ViewModel() {
 
     fun loadCityData(cityId: String) {
         viewModelScope.launch {
+            println("DEBUG: ========== LOADING CITY DATA ==========")
+            println("DEBUG: CityId: $cityId")
             _isLoading.value = true
             try {
                 // Load city
@@ -48,15 +50,34 @@ class CityDetailsViewModel : ViewModel() {
                     createdBy = cityDoc.getString("createdBy") ?: "",
                     createdAt = cityDoc.getTimestamp("createdAt") ?: Timestamp.now()
                 )
+                println("DEBUG: City loaded: ${_city.value?.name}")
 
                 // Load locations for this city
-                val locationsList = db.collection("locations")
+                println("DEBUG: Querying locations collection for cityId: $cityId")
+                val locationsQuery = db.collection("locations")
                     .whereEqualTo("cityId", cityId)
                     .get()
                     .await()
-                    .documents
-                    .map { doc ->
-                        Location(
+                
+                println("DEBUG: Query completed. Found ${locationsQuery.documents.size} documents")
+                
+                if (locationsQuery.documents.isEmpty()) {
+                    println("DEBUG: ⚠️ No locations found for this city!")
+                    println("DEBUG: Check Firebase Console if locations exist with cityId: $cityId")
+                }
+                
+                val locationsList = locationsQuery.documents.mapIndexedNotNull { index, doc ->
+                    try {
+                        println("DEBUG: [$index] Processing location document: ${doc.id}")
+                        val locationData = mapOf(
+                            "name" to doc.getString("name"),
+                            "cityId" to doc.getString("cityId"),
+                            "category" to doc.getString("category"),
+                            "imageUrl" to doc.getString("imageUrl")
+                        )
+                        println("DEBUG: [$index] Location data: $locationData")
+                        
+                        val location = Location(
                             id = doc.id,
                             name = doc.getString("name") ?: "",
                             description = doc.getString("description") ?: "",
@@ -70,10 +91,24 @@ class CityDetailsViewModel : ViewModel() {
                             totalRatings = (doc.getLong("totalRatings") ?: 0).toInt(),
                             imageUrl = doc.getString("imageUrl") ?: ""
                         )
+                        println("DEBUG: [$index] ✅ Location parsed successfully: ${location.name}")
+                        location
+                    } catch (e: Exception) {
+                        println("DEBUG: [$index] ❌ Error parsing location ${doc.id}: ${e.message}")
+                        e.printStackTrace()
+                        null
                     }
+                }
+                
+                println("DEBUG: Successfully parsed ${locationsList.size} out of ${locationsQuery.documents.size} locations")
+                println("DEBUG: Updating _locations state...")
                 _locations.value = locationsList
                 _filteredLocations.value = locationsList
+                println("DEBUG: State updated. _locations.value.size = ${_locations.value.size}")
+                println("DEBUG: State updated. _filteredLocations.value.size = ${_filteredLocations.value.size}")
+                println("DEBUG: ========== LOADING COMPLETE ==========")
             } catch (e: Exception) {
+                println("DEBUG: ❌ Error loading city data: ${e.message}")
                 e.printStackTrace()
             } finally {
                 _isLoading.value = false
@@ -111,6 +146,7 @@ class CityDetailsViewModel : ViewModel() {
     }
 
     fun refreshData(cityId: String) {
+        println("DEBUG: Manual refresh triggered for cityId: $cityId")
         loadCityData(cityId)
     }
 }
