@@ -7,6 +7,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import edu.ap.citytripapplication.model.Review
+import edu.ap.citytripapplication.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,7 @@ data class ReviewState(
 class ReviewViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val userRepository = UserRepository(firestore = firestore, auth = auth)
 
     private val _reviewState = MutableStateFlow(ReviewState())
     val reviewState: StateFlow<ReviewState> = _reviewState.asStateFlow()
@@ -60,12 +62,30 @@ class ReviewViewModel : ViewModel() {
                     try {
                         println("DEBUG: Processing review doc: ${doc.id}")
                         println("DEBUG: Review data: ${doc.data}")
+
+                        val userId = doc.getString("userId") ?: ""
+                        var userName = doc.getString("userName")
+                        val userEmail = doc.getString("userEmail") ?: ""
+
+                        // If review document doesn't have a userName, try to resolve from user repository
+                        if (userName.isNullOrBlank() && userId.isNotBlank()) {
+                            try {
+                                val user = userRepository.getUserById(userId)
+                                if (user != null) {
+                                    val fullName = listOfNotNull(user.firstName.takeIf { it.isNotBlank() }, user.lastName.takeIf { it.isNotBlank() }).joinToString(" ")
+                                    userName = if (fullName.isNotBlank()) fullName else user.email
+                                }
+                            } catch (e: Exception) {
+                                // ignore lookup failure and keep fallback
+                            }
+                        }
+
                         Review(
                             id = doc.id,
                             locationId = doc.getString("locationId") ?: "",
-                            userId = doc.getString("userId") ?: "",
-                            userName = doc.getString("userName") ?: "Anoniem",
-                            userEmail = doc.getString("userEmail") ?: "",
+                            userId = userId,
+                            userName = userName ?: "Anoniem",
+                            userEmail = userEmail,
                             rating = (doc.getLong("rating") ?: 0).toInt(),
                             comment = doc.getString("comment") ?: "",
                             createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now()
@@ -139,11 +159,19 @@ class ReviewViewModel : ViewModel() {
 
                 // Create new review
                 val reviewId = UUID.randomUUID().toString()
+
+                // Resolve user's display name using repository (prefer first+last name)
+                val repoUser = try { userRepository.getCurrentUser() } catch (e: Exception) { null }
+                val displayName = repoUser?.let { u ->
+                    val full = listOfNotNull(u.firstName.takeIf { it.isNotBlank() }, u.lastName.takeIf { it.isNotBlank() }).joinToString(" ")
+                    if (full.isNotBlank()) full else u.email
+                } ?: currentUser.displayName ?: currentUser.email ?: "Anoniem"
+
                 val review = Review(
                     id = reviewId,
                     locationId = locationId,
                     userId = currentUser.uid,
-                    userName = currentUser.email?.substringBefore("@") ?: "Anoniem",
+                    userName = displayName,
                     userEmail = currentUser.email ?: "",
                     rating = rating,
                     comment = comment,

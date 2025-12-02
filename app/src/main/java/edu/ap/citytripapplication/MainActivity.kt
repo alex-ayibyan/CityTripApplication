@@ -38,6 +38,16 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.osmdroid.views.overlay.Marker
+import androidx.core.content.ContextCompat
+import edu.ap.citytripapplication.database.CityTripDatabase
+import edu.ap.citytripapplication.repository.CityTripRepository
+import edu.ap.citytripapplication.viewmodel.CitiesViewModel
+import edu.ap.citytripapplication.model.Location as AppLocation
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,6 +81,30 @@ fun MapScreen(
     val authViewModel: AuthViewModel = viewModel()
     val fusedLocationClient = remember {
         LocationServices.getFusedLocationProviderClient(context)
+    }
+
+    // ViewModels / data
+    val citiesViewModel: CitiesViewModel = viewModel()
+    val citiesState by citiesViewModel.uiState.collectAsState()
+
+    // Repository to access cached locations
+    val application = LocalContext.current.applicationContext as android.app.Application
+    val database = CityTripDatabase.getDatabase(application)
+    val repository = CityTripRepository(
+        cityDao = database.cityDao(),
+        locationDao = database.locationDao(),
+        reviewDao = database.reviewDao()
+    )
+
+    val locationsState = remember { mutableStateListOf<AppLocation>() }
+    val scope = rememberCoroutineScope()
+
+    // Collect locations from local cache
+    LaunchedEffect(Unit) {
+        repository.getAllLocationsFlow().collect { list ->
+            locationsState.clear()
+            locationsState.addAll(list)
+        }
     }
 
     // MapView state
@@ -206,6 +240,57 @@ fun MapScreen(
                         overlay.enableMyLocation()
                         view.overlays.add(overlay)
                         locationOverlay = overlay
+                    }
+
+                    // Remove existing city/location markers to avoid duplicates
+                    val toRemove = view.overlays.filterIsInstance<Marker>()
+                    toRemove.forEach { view.overlays.remove(it) }
+
+                    // Add city markers
+                    citiesState.cities.forEach { city ->
+                        try {
+                            val marker = Marker(view)
+                            marker.position = GeoPoint(city.latitude, city.longitude)
+                            marker.title = city.name
+                            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            marker.infoWindow = null
+                            marker.setOnMarkerClickListener { m, mv ->
+                                // navigate to city details
+                                navController?.navigate(
+                                    edu.ap.citytripapplication.navigation.Screen.CityDetails.createRoute(city.id)
+                                )
+                                true
+                            }
+                            view.overlays.add(marker)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+
+                    // Add location markers (different small marker)
+                    locationsState.forEach { loc ->
+                        try {
+                            val marker = Marker(view)
+                            marker.position = GeoPoint(loc.latitude, loc.longitude)
+                            marker.title = loc.name
+                            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            marker.infoWindow = null
+                            marker.setOnMarkerClickListener { m, mv ->
+                                // navigate to city details or location details: if location has cityId, open city, else fallback
+                                if (loc.cityId.isNotBlank()) {
+                                    navController?.navigate(
+                                        edu.ap.citytripapplication.navigation.Screen.CityDetails.createRoute(loc.cityId)
+                                    )
+                                } else {
+                                    // no dedicated location details route exists; navigate to city list as fallback
+                                    navController?.navigate(edu.ap.citytripapplication.navigation.Screen.CitiesList.route)
+                                }
+                                true
+                            }
+                            view.overlays.add(marker)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             )
