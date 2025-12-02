@@ -24,7 +24,8 @@ fun CitiesListScreen(
     onNavigateToCityDetails: (String) -> Unit,
     onAddCity: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onNavigateToChats: () -> Unit
+    onNavigateToChats: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     val viewModel: CitiesViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -40,13 +41,7 @@ fun CitiesListScreen(
                 title = { 
                     Column {
                         Text("Steden")
-                        if (uiState.lastSyncTime != null) {
-                            Text(
-                                text = "Laatst gesynchroniseerd: ${formatSyncTime(uiState.lastSyncTime!!)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                            )
-                        }
+
                     }
                 },
                 navigationIcon = {
@@ -85,6 +80,19 @@ fun CitiesListScreen(
                     }
                     
                     // Chats button
+                    // Profile button
+                    IconButton(
+                        onClick = onNavigateToProfile,
+                        modifier = Modifier.padding(4.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profiel",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = onNavigateToChats,
                         modifier = Modifier.padding(4.dp)

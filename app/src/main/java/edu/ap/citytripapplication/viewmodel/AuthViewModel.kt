@@ -75,7 +75,6 @@ class AuthViewModel : ViewModel() {
                     // Create user document in Firestore
                     val userDoc = User(
                         id = firebaseUser.uid,
-                        name = displayName.ifBlank { firebaseUser.email ?: "" },
                         firstName = firstName.trim(),
                         lastName = lastName.trim(),
                         email = firebaseUser.email ?: "",

@@ -20,6 +20,7 @@ import edu.ap.citytripapplication.ui.screens.CityDetailsScreen
 import edu.ap.citytripapplication.ui.screens.LoginScreen
 import edu.ap.citytripapplication.ui.screens.NewChatScreen
 import edu.ap.citytripapplication.ui.screens.RegisterScreen
+import edu.ap.citytripapplication.ui.screens.EditProfileScreen
 import edu.ap.citytripapplication.ui.screens.UserListScreen
 import edu.ap.citytripapplication.viewmodel.AuthViewModel
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
@@ -37,6 +38,8 @@ sealed class Screen(val route: String) {
             "addLocation/$cityId/$latitude/$longitude"
     }
     data object Map : Screen("map")
+
+    object EditProfile : Screen("edit_profile")
 
     object ChatList : Screen("chat_list")
     object UserList : Screen("user_list")
@@ -108,6 +111,9 @@ fun AppNavigation() {
                 },
                 onNavigateToChats = {
                     navController.navigate(Screen.ChatList.route)
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.EditProfile.route)
                 }
             )
         }
@@ -175,6 +181,10 @@ fun AppNavigation() {
                     navController.popBackStack()
                 }
             )
+        }
+
+        composable(Screen.EditProfile.route) {
+            EditProfileScreen(navController = navController)
         }
 
         composable(Screen.ChatList.route) {

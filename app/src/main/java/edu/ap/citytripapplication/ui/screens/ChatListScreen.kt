@@ -235,7 +235,6 @@ private fun getParticipantName(conversation: Conversation, users: List<User>, cu
         .joinToString(" ").takeIf { it.isNotBlank() }
 
     return fullName
-        ?: user?.name?.takeIf { it.isNotBlank() }
         ?: user?.email?.takeIf { it.isNotBlank() }
         ?: "User"
 }

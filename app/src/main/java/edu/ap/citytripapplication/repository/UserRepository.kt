@@ -16,6 +16,41 @@ class UserRepository @Inject constructor(
     private val auth: FirebaseAuth
 ) {
 
+    // Helper to convert a Firestore document snapshot into a User,
+    // handling legacy `name` field by splitting into first/last when needed.
+    private fun mapDocumentToUser(document: com.google.firebase.firestore.DocumentSnapshot): User? {
+        return try {
+            val id = document.id
+            val firstName = document.getString("firstName") ?: ""
+            val lastName = document.getString("lastName") ?: ""
+            val email = document.getString("email") ?: ""
+            val profileImage = document.getString("profileImage") ?: ""
+
+            // Keep first/last as stored. If both are blank, leave them blank.
+            val resolvedFirst = firstName
+            val resolvedLast = lastName
+
+            val lastSeen = document.getTimestamp("lastSeen") ?: com.google.firebase.Timestamp.now()
+            val createdAt = document.getTimestamp("createdAt") ?: com.google.firebase.Timestamp.now()
+            val updatedAt = document.getTimestamp("updatedAt") ?: com.google.firebase.Timestamp.now()
+
+            User(
+                id = id,
+                firstName = resolvedFirst,
+                lastName = resolvedLast,
+                email = email,
+                profileImage = profileImage,
+                isOnline = document.getBoolean("isOnline") ?: false,
+                lastSeen = lastSeen,
+                createdAt = createdAt,
+                updatedAt = updatedAt
+            )
+        } catch (e: Exception) {
+            Log.e("UserRepository", "Error mapping user document", e)
+            null
+        }
+    }
+
     /**
      * Get current user from Firebase
      */
@@ -29,12 +64,19 @@ class UserRepository @Inject constructor(
                 .await()
 
             if (userDoc.exists()) {
-                userDoc.toObject(User::class.java)?.copy(id = userDoc.id)
+                mapDocumentToUser(userDoc)
             } else {
                 // Create a basic user profile if it doesn't exist
+                // Try to split displayName into first/last if present
+                val displayName = firebaseUser.displayName ?: ""
+                val nameParts = displayName.trim().split(" ").filter { it.isNotBlank() }
+                val firstName = nameParts.firstOrNull() ?: ""
+                val lastName = if (nameParts.size > 1) nameParts.drop(1).joinToString(" ") else ""
+
                 val newUser = User(
                     id = firebaseUser.uid,
-                    name = firebaseUser.displayName ?: "User",
+                    firstName = firstName,
+                    lastName = lastName,
                     email = firebaseUser.email ?: "",
                     profileImage = firebaseUser.photoUrl?.toString() ?: "",
                     createdAt = com.google.firebase.Timestamp.now()
@@ -65,7 +107,7 @@ class UserRepository @Inject constructor(
                 .await()
 
             if (userDoc.exists()) {
-                userDoc.toObject(User::class.java)?.copy(id = userDoc.id)
+                mapDocumentToUser(userDoc)
             } else {
                 null
             }
@@ -80,7 +122,7 @@ class UserRepository @Inject constructor(
      */
     fun getAllUsers(): Flow<List<User>> = callbackFlow {
         val listener = firestore.collection("users")
-            .orderBy("name")
+            .orderBy("firstName")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e("UserRepository", "Error getting users", error)
@@ -89,13 +131,7 @@ class UserRepository @Inject constructor(
                 }
 
                 val users = snapshot?.documents?.mapNotNull { document ->
-                    try {
-                        val user = document.toObject(User::class.java)
-                        user?.copy(id = document.id)
-                    } catch (e: Exception) {
-                        Log.e("UserRepository", "Error parsing user", e)
-                        null
-                    }
+                    mapDocumentToUser(document)
                 } ?: emptyList()
 
                 trySend(users)
@@ -108,31 +144,53 @@ class UserRepository @Inject constructor(
      * Search users by name
      */
     fun searchUsers(query: String): Flow<List<User>> = callbackFlow {
-        val listener = firestore.collection("users")
-            .orderBy("name")
-            .startAt(query)
-            .endAt(query + "\uf8ff")
+        val q = query.trim()
+
+        // We'll run two prefix listeners: one on firstName and one on email, then merge results.
+        val combined = linkedMapOf<String, User>()
+
+        val firstNameListener = firestore.collection("users")
+            .orderBy("firstName")
+            .startAt(q)
+            .endAt(q + "\uf8ff")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e("UserRepository", "Error searching users", error)
+                    Log.e("UserRepository", "Error searching users by firstName", error)
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
 
-                val users = snapshot?.documents?.mapNotNull { document ->
-                    try {
-                        val user = document.toObject(User::class.java)
-                        user?.copy(id = document.id)
-                    } catch (e: Exception) {
-                        Log.e("UserRepository", "Error parsing user", e)
-                        null
-                    }
-                } ?: emptyList()
+                // Update combined map with firstName results
+                snapshot?.documents?.forEach { doc ->
+                    mapDocumentToUser(doc)?.let { combined[it.id] = it }
+                }
 
-                trySend(users)
+                trySend(combined.values.toList())
             }
 
-        awaitClose { listener.remove() }
+        val emailListener = firestore.collection("users")
+            .orderBy("email")
+            .startAt(q)
+            .endAt(q + "\uf8ff")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("UserRepository", "Error searching users by email", error)
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+
+                // Update combined map with email results
+                snapshot?.documents?.forEach { doc ->
+                    mapDocumentToUser(doc)?.let { combined[it.id] = it }
+                }
+
+                trySend(combined.values.toList())
+            }
+
+        awaitClose {
+            firstNameListener.remove()
+            emailListener.remove()
+        }
     }
 
     /**
@@ -140,14 +198,17 @@ class UserRepository @Inject constructor(
      */
     suspend fun updateUserProfile(
         userId: String,
-        name: String,
+        firstName: String? = null,
+        lastName: String? = null,
         profileImage: String? = null
     ): Result<User> {
         return try {
             val updates = hashMapOf<String, Any>(
-                "name" to name,
                 "updatedAt" to com.google.firebase.Timestamp.now()
             )
+
+            firstName?.let { if (it.isNotBlank()) updates["firstName"] = it }
+            lastName?.let { if (it.isNotBlank()) updates["lastName"] = it }
 
             profileImage?.let {
                 updates["profileImage"] = it
