@@ -33,6 +33,9 @@ import com.google.firebase.auth.FirebaseAuth
 import edu.ap.citytripapplication.viewmodel.ChatViewModel
 import edu.ap.citytripapplication.viewmodel.CitiesViewModel
 import edu.ap.citytripapplication.model.Conversation
+import com.google.firebase.firestore.FirebaseFirestore
+import edu.ap.citytripapplication.repository.UserRepository
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +57,27 @@ fun ChatScreen(
     var messageText by remember { mutableStateOf("") }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
 
+    var participantName by remember { mutableStateOf("Chat") }
+
+    LaunchedEffect(receiverId) {
+        try {
+            val userRepo = UserRepository(
+                firestore = FirebaseFirestore.getInstance(),
+                auth = FirebaseAuth.getInstance()
+            )
+            val user = userRepo.getUserById(receiverId)
+            if (user != null) {
+                val full = listOfNotNull(
+                    user.firstName.takeIf { it.isNotBlank() },
+                    user.lastName.takeIf { it.isNotBlank() }
+                ).joinToString(" ")
+                participantName = if (full.isNotBlank()) full else user.email
+            }
+        } catch (e: Exception) {
+            // keep default
+        }
+    }
+
     LaunchedEffect(conversationId) {
         viewModel.loadMessages(conversationId)
     }
@@ -67,7 +91,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chat") },
+                title = { Text(participantName) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

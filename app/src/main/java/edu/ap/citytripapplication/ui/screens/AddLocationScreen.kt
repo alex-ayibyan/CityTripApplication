@@ -47,14 +47,12 @@ fun AddLocationScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Bepaal welke permission we nodig hebben op basis van Android versie
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
 
-    // Check of we permission hebben
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(

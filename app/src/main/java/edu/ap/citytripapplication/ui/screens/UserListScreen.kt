@@ -41,7 +41,7 @@ fun UserListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Select User") },
+                title = { Text("Gebruiker Kiezen") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -72,7 +72,7 @@ fun UserListScreen(
                 ) {
                     Icon(
                         Icons.Default.Search,
-                        contentDescription = "Search",
+                        contentDescription = "Zoek",
                         modifier = Modifier.size(20.dp)
                     )
 
@@ -85,7 +85,7 @@ fun UserListScreen(
                             viewModel.searchUsers(it.text)
                         },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Search users...") },
+                        placeholder = { Text("Gebruikers Zoeken...") },
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -110,13 +110,13 @@ fun UserListScreen(
                 ) {
                     Icon(
                         Icons.Default.Person,
-                        contentDescription = "No users",
+                        contentDescription = "Geen Gebruikers",
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "No users found",
+                        "Geen Gebruikers Gevonden",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )

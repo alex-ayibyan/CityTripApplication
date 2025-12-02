@@ -27,12 +27,20 @@ fun EditProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit profile") },
+                title = { Text("Profiel bewerken") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     ) { paddingValues ->
@@ -41,15 +49,16 @@ fun EditProfileScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
 
             OutlinedTextField(
                 value = firstName,
                 onValueChange = { viewModel.setFirstName(it) },
-                label = { Text("First name") },
+                label = { Text("Voornaam") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = !isLoading,
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -57,9 +66,10 @@ fun EditProfileScreen(
             OutlinedTextField(
                 value = lastName,
                 onValueChange = { viewModel.setLastName(it) },
-                label = { Text("Last name") },
+                label = { Text("Achternaam") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = !isLoading,
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -68,9 +78,10 @@ fun EditProfileScreen(
             OutlinedTextField(
                 value = currentUser?.email ?: "",
                 onValueChange = {},
-                label = { Text("Email") },
+                label = { Text("E-mail") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = false
+                enabled = false,
+                singleLine = true
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -87,12 +98,21 @@ fun EditProfileScreen(
                     }
                 },
                 enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 } else {
-                    Text("Save")
+                    Text("Opslaan")
                 }
             }
         }

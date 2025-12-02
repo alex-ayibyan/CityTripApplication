@@ -46,13 +46,25 @@ class CityTripRepository(
                 .await()
 
             val cachedCities = citiesSnapshot.documents.map { doc ->
+                // Firestore might store numbers as Long or Double; handle both
+                val lat = when (val v = doc.get("latitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+                val lon = when (val v = doc.get("longitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+
                 CachedCity(
                     id = doc.id,
                     name = doc.getString("name") ?: "",
                     country = doc.getString("country") ?: "",
                     description = doc.getString("description") ?: "",
-                    latitude = doc.getDouble("latitude") ?: 0.0,
-                    longitude = doc.getDouble("longitude") ?: 0.0,
+                    latitude = lat,
+                    longitude = lon,
                     imageUrl = doc.getString("imageUrl") ?: "",
                     createdBy = doc.getString("createdBy") ?: "",
                     createdAt = (doc.getTimestamp("createdAt") ?: Timestamp.now()).seconds * 1000,
@@ -107,17 +119,28 @@ class CityTripRepository(
                 .await()
 
             val cachedLocations = locationsSnapshot.documents.map { doc ->
+                val lat = when (val v = doc.get("latitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+                val lon = when (val v = doc.get("longitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+
                 CachedLocation(
                     id = doc.id,
                     name = doc.getString("name") ?: "",
                     description = doc.getString("description") ?: "",
-                    latitude = doc.getDouble("latitude") ?: 0.0,
-                    longitude = doc.getDouble("longitude") ?: 0.0,
+                    latitude = lat,
+                    longitude = lon,
                     category = doc.getString("category") ?: "OTHER",
                     cityId = doc.getString("cityId") ?: "",
                     userId = doc.getString("userId") ?: "",
                     createdAt = (doc.getTimestamp("createdAt") ?: Timestamp.now()).seconds * 1000,
-                    averageRating = doc.getDouble("averageRating") ?: 0.0,
+                    averageRating = (doc.get("averageRating") as? Number)?.toDouble() ?: 0.0,
                     totalRatings = (doc.getLong("totalRatings") ?: 0).toInt(),
                     imageUrl = doc.getString("imageUrl") ?: "",
                     lastSyncedAt = System.currentTimeMillis()
@@ -148,17 +171,28 @@ class CityTripRepository(
                 .await()
 
             val cachedLocations = locationsSnapshot.documents.map { doc ->
+                val lat = when (val v = doc.get("latitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+                val lon = when (val v = doc.get("longitude")) {
+                    is Number -> v.toDouble()
+                    is String -> v.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+
                 CachedLocation(
                     id = doc.id,
                     name = doc.getString("name") ?: "",
                     description = doc.getString("description") ?: "",
-                    latitude = doc.getDouble("latitude") ?: 0.0,
-                    longitude = doc.getDouble("longitude") ?: 0.0,
+                    latitude = lat,
+                    longitude = lon,
                     category = doc.getString("category") ?: "OTHER",
                     cityId = doc.getString("cityId") ?: "",
                     userId = doc.getString("userId") ?: "",
                     createdAt = (doc.getTimestamp("createdAt") ?: Timestamp.now()).seconds * 1000,
-                    averageRating = doc.getDouble("averageRating") ?: 0.0,
+                    averageRating = (doc.get("averageRating") as? Number)?.toDouble() ?: 0.0,
                     totalRatings = (doc.getLong("totalRatings") ?: 0).toInt(),
                     imageUrl = doc.getString("imageUrl") ?: "",
                     lastSyncedAt = System.currentTimeMillis()

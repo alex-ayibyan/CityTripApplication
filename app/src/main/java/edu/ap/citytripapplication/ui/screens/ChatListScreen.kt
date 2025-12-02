@@ -43,7 +43,7 @@ fun ChatListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Messages") },
+                title = { Text("Berichten") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -74,13 +74,13 @@ fun ChatListScreen(
             ) {
                 Icon(
                     Icons.Default.Message,
-                    contentDescription = "No messages",
+                    contentDescription = "Geen Berichten",
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "No messages yet",
+                    "Nog geen gesprekken",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
@@ -113,23 +113,22 @@ fun ChatListScreen(
         }
     }
 
-    // Delete confirmation dialog
     conversationToDelete?.let { convo ->
         AlertDialog(
             onDismissRequest = { conversationToDelete = null },
-            title = { Text("Delete conversation") },
-            text = { Text("Are you sure you want to delete this conversation? This cannot be undone.") },
+            title = { Text("Verwijder Gesprek") },
+            text = { Text("Bent u zeker dat u dit gesprek wilt verwijderen? Dit kan niet ongedaan worden.") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteConversation(convo.id)
                     conversationToDelete = null
                 }) {
-                    Text("Delete")
+                    Text("Verwijder")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { conversationToDelete = null }) {
-                    Text("Cancel")
+                    Text("Annuleer")
                 }
             }
         )
@@ -217,7 +216,6 @@ fun ConversationItem(
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
-                // Delete button
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete conversation")
                 }
@@ -226,11 +224,9 @@ fun ConversationItem(
     }
 }
 
-// Helper function to get participant display (prefer email)
 private fun getParticipantName(conversation: Conversation, users: List<User>, currentUserId: String?): String {
     val otherId = conversation.participantIds.firstOrNull { it != currentUserId } ?: return "User"
     val user = users.find { it.id == otherId }
-    // Prefer first+last name when available, fall back to name, then email
     val fullName = listOfNotNull(user?.firstName?.takeIf { it.isNotBlank() }, user?.lastName?.takeIf { it.isNotBlank() })
         .joinToString(" ").takeIf { it.isNotBlank() }
 

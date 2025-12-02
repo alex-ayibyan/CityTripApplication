@@ -99,9 +99,22 @@ fun MapScreen(
     val locationsState = remember { mutableStateListOf<AppLocation>() }
     val scope = rememberCoroutineScope()
 
-    // Collect locations from local cache
+    // Collect locations from local cache and run a one-time background sync
     LaunchedEffect(Unit) {
+        // Start background sync concurrently so cached DB gets populated
+        scope.launch {
+            try {
+                repository.syncLocationsFromFirebase()
+            } catch (e: Exception) {
+                // ignore sync errors; we'll still collect whatever is cached
+                e.printStackTrace()
+            }
+        }
+        
+        // Collect cached locations (will update after sync completes)
         repository.getAllLocationsFlow().collect { list ->
+            println("DEBUG: MapScreen - loaded ${list.size} cached locations:")
+            list.forEach { l -> println("  - ${l.id}: ${l.name} @ ${l.latitude}, ${l.longitude}") }
             locationsState.clear()
             locationsState.addAll(list)
         }
