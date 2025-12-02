@@ -13,10 +13,14 @@ import androidx.navigation.navArgument
 import edu.ap.citytripapplication.MapScreen
 import edu.ap.citytripapplication.ui.screens.AddCityScreen
 import edu.ap.citytripapplication.ui.screens.AddLocationScreen
+import edu.ap.citytripapplication.ui.screens.ChatListScreen
+import edu.ap.citytripapplication.ui.screens.ChatScreen
 import edu.ap.citytripapplication.ui.screens.CitiesListScreen
 import edu.ap.citytripapplication.ui.screens.CityDetailsScreen
 import edu.ap.citytripapplication.ui.screens.LoginScreen
+import edu.ap.citytripapplication.ui.screens.NewChatScreen
 import edu.ap.citytripapplication.ui.screens.RegisterScreen
+import edu.ap.citytripapplication.ui.screens.UserListScreen
 import edu.ap.citytripapplication.viewmodel.AuthViewModel
 import edu.ap.citytripapplication.viewmodel.LocationViewModel
 
@@ -33,6 +37,15 @@ sealed class Screen(val route: String) {
             "addLocation/$cityId/$latitude/$longitude"
     }
     data object Map : Screen("map")
+
+    object ChatList : Screen("chat_list")
+    object UserList : Screen("user_list")
+    object Chat : Screen("chat/{conversationId}/{receiverId}") {
+        fun createRoute(conversationId: String, receiverId: String) =
+            "chat/$conversationId/$receiverId" }
+    object NewChat : Screen("new_chat/{receiverId}") {
+        fun createRoute(receiverId: String) = "new_chat/$receiverId"
+    }
 }
 
 @Composable
@@ -92,6 +105,9 @@ fun AppNavigation() {
                 },
                 onNavigateToMap = {
                     navController.navigate(Screen.Map.route)
+                },
+                onNavigateToChats = {
+                    navController.navigate(Screen.ChatList.route)
                 }
             )
         }
@@ -159,6 +175,36 @@ fun AppNavigation() {
                     navController.popBackStack()
                 }
             )
+        }
+
+        composable(Screen.ChatList.route) {
+            ChatListScreen(navController)
+        }
+
+        composable(Screen.UserList.route) {
+            UserListScreen(navController)
+        }
+
+        composable(
+            route = Screen.Chat.route,
+            arguments = listOf(
+                navArgument("conversationId") { type = NavType.StringType },
+                navArgument("receiverId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+            val receiverId = backStackEntry.arguments?.getString("receiverId") ?: ""
+            ChatScreen(navController, conversationId, receiverId)
+        }
+
+        composable(
+            route = Screen.NewChat.route,
+            arguments = listOf(
+                navArgument("receiverId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val receiverId = backStackEntry.arguments?.getString("receiverId") ?: ""
+            NewChatScreen(navController, receiverId)
         }
     }
 }

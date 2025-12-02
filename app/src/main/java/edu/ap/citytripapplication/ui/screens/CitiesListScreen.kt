@@ -23,7 +23,8 @@ fun CitiesListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToCityDetails: (String) -> Unit,
     onAddCity: () -> Unit,
-    onNavigateToMap: () -> Unit
+    onNavigateToMap: () -> Unit,
+    onNavigateToChats: () -> Unit
 ) {
     val viewModel: CitiesViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -83,6 +84,20 @@ fun CitiesListScreen(
                         }
                     }
                     
+                    // Chats button
+                    IconButton(
+                        onClick = onNavigateToChats,
+                        modifier = Modifier.padding(4.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Message,
+                                contentDescription = "Berichten",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
                     // Map button
                     IconButton(
                         onClick = onNavigateToMap,

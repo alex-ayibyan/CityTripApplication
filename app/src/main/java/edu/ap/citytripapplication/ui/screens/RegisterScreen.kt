@@ -35,6 +35,8 @@ fun RegisterScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var passwordError by remember { mutableStateOf<String?>(null) }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
     
     val authState by viewModel.authState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -79,6 +81,42 @@ fun RegisterScreen(
             )
             
             Spacer(modifier = Modifier.height(8.dp))
+            // First and Last name fields
+            OutlinedTextField(
+                value = firstName,
+                onValueChange = { firstName = it },
+                label = { Text("Voornaam") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !authState.isLoading
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = lastName,
+                onValueChange = { lastName = it },
+                label = { Text("Achternaam") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !authState.isLoading
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
             
             Text(
                 text = "Vul je gegevens in om te registreren",
@@ -169,13 +207,13 @@ fun RegisterScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        focusManager.clearFocus()
-                        if (password == confirmPassword) {
-                            viewModel.signUp(email, password, onRegisterSuccess)
-                        } else {
-                            passwordError = "Wachtwoorden komen niet overeen"
+                            focusManager.clearFocus()
+                            if (password == confirmPassword) {
+                                viewModel.signUp(email, password, firstName, lastName, onRegisterSuccess)
+                            } else {
+                                passwordError = "Wachtwoorden komen niet overeen"
+                            }
                         }
-                    }
                 ),
                 trailingIcon = {
                     IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
@@ -226,7 +264,7 @@ fun RegisterScreen(
                         passwordError = "Wachtwoorden komen niet overeen"
                     } else {
                         passwordError = null
-                        viewModel.signUp(email, password, onRegisterSuccess)
+                        viewModel.signUp(email, password, firstName, lastName, onRegisterSuccess)
                     }
                 },
                 modifier = Modifier

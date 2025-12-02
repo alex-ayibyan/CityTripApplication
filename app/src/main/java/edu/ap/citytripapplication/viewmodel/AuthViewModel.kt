@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FirebaseFirestore
+import edu.ap.citytripapplication.model.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +22,7 @@ data class AuthState(
 
 class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
     
     private val _authState = MutableStateFlow(AuthState())
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
@@ -35,7 +39,7 @@ class AuthViewModel : ViewModel() {
         )
     }
 
-    fun signUp(email: String, password: String, onSuccess: () -> Unit) {
+    fun signUp(email: String, password: String, firstName: String = "", lastName: String = "", onSuccess: () -> Unit) {
         if (email.isBlank() || password.isBlank()) {
             _authState.value = _authState.value.copy(
                 error = "Email en wachtwoord mogen niet leeg zijn"
@@ -54,11 +58,43 @@ class AuthViewModel : ViewModel() {
             _authState.value = _authState.value.copy(isLoading = true, error = null)
             try {
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
-                _authState.value = AuthState(
-                    isAuthenticated = true,
-                    user = result.user
-                )
-                onSuccess()
+                val firebaseUser = result.user
+
+                // Build display name from first/last if provided, else leave empty
+                val displayName = listOf(firstName.trim(), lastName.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+
+                if (firebaseUser != null) {
+                    // Update FirebaseUser profile displayName
+                    if (displayName.isNotBlank()) {
+                        val profileUpdates = UserProfileChangeRequest.Builder()
+                            .setDisplayName(displayName)
+                            .build()
+                        firebaseUser.updateProfile(profileUpdates).await()
+                    }
+
+                    // Create user document in Firestore
+                    val userDoc = User(
+                        id = firebaseUser.uid,
+                        name = displayName.ifBlank { firebaseUser.email ?: "" },
+                        firstName = firstName.trim(),
+                        lastName = lastName.trim(),
+                        email = firebaseUser.email ?: "",
+                        profileImage = firebaseUser.photoUrl?.toString() ?: "",
+                        createdAt = com.google.firebase.Timestamp.now(),
+                        updatedAt = com.google.firebase.Timestamp.now()
+                    )
+
+                    firestore.collection("users").document(firebaseUser.uid).set(userDoc).await()
+
+                    _authState.value = AuthState(
+                        isAuthenticated = true,
+                        user = firebaseUser
+                    )
+
+                    onSuccess()
+                } else {
+                    _authState.value = _authState.value.copy(isLoading = false, error = "Registratie mislukt: geen gebruikersaccount aangemaakt")
+                }
             } catch (e: Exception) {
                 _authState.value = _authState.value.copy(
                     isLoading = false,
